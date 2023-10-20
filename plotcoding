@@ -1,0 +1,271 @@
+### SV annotation
+*R*
+
+library("ChIPseeker")
+
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+N01 = readPeakFile('E:/Users/DELL/Desktop/SV/N01.bed')
+N02 = readPeakFile('E:/Users/DELL/Desktop/SV/N02.bed')
+N03 = readPeakFile('E:/Users/DELL/Desktop/SV/N03.bed')
+N04 = readPeakFile('E:/Users/DELL/Desktop/SV/N04.bed')
+N02_uniq = readPeakFile('E:/Users/DELL/Desktop/SV/groupA.bed')
+N04_uniq = readPeakFile('E:/Users/DELL/Desktop/SV/groupB.bed')
+
+peaks <- list(N01=N01,N02=N02,N03=N03,N04=N04,N02_uniq=N02_uniq,N04_uniq=N04_uniq)
+promoter <- getPromoters(TxDb=txdb, upstream=1000, downstream=1000)
+tagMatrixList <- lapply(peaks, getTagMatrix, windows=promoter)
+
+options(ChIPseeker.ignore_1st_exon = T)
+options(ChIPseeker.ignore_1st_intron = T)
+options(ChIPseeker.ignore_promoter_subcategory = T)
+
+peakAnnoList <- lapply(peaks, annotatePeak, TxDb=txdb,tssRegion=c(-1000, 1000), verbose=FALSE,addFlankGeneInfo=TRUE, flankDistance=5000,annoDb="org.Hs.eg.db")
+plotAnnoBar(peakAnnoList,title="Genomic distribution of sample SV",col=rainbow(7))
+
+
+vennpie(peakAnnoList)
+upsetplot(peakAnno, vennpie=TRUE)
+
+
+*Python*
+
+# -*- coding: utf-8 -*-
+
+"""
+the proportion of overlaping all four samples SV site
+"""
+
+import os
+import pandas as pd
+import numpy as np
+def savetxt(filename,x):
+	np.savetxt(filename,x,delimiter = '\t',fmt='%s')
+    
+nrow_number=[]
+file_path = 'E:/Users/DELL/Desktop/samples_overlaped'
+dirs = os.listdir(file_path)
+for K in range(len(dirs)):
+    info=dirs[K]
+    domain = os.path.abspath(r'E:/Users/DELL/Desktop/samples_overlaped')
+    info = os.path.join(domain,info)
+    info = open(info,'r')
+    file_new=open('E:/Users/DELL/Desktop/samples_overlaped/'+dirs[K])
+    files=pd.read_csv(file_new,sep="\t",header=None)
+    data=files.values.tolist()
+    pp=dirs[K].strip()
+
+    print(pp)      
+    nrow_number.append(pp+"\t"+str(len(data)))
+        
+savetxt("E:/Users/DELL/Desktop/sampleSV_overlap_number.txt",nrow_number)
+
+
+
+# -*- coding: utf-8 -*-
+"""
+heatmap plot
+"""
+import pandas as pd
+import seaborn as sns
+df=pd.read_csv('G:/1_sample_overlap_matrix.txt',sep='\t',index_col=0)
+
+from scipy.stats import zscore
+# df2=df.apply(zscore)
+a=sns.clustermap(df, cmap='Reds',row_cluster=False,col_cluster=False,figsize=(7.5,7.5),cbar_pos=(0.02, 0.7, 0.02, 0.2))
+c=a.data2d
+sns.set(font_scale=2)
+a.savefig("G:/cluster_heatmap.png",dpi=300)
+
+
+###Random test###
+
+##shuffle boxplot##
+
+*R*
+
+library(tidyverse)
+library(ggsignif)
+library(cowplot)
+library(ggpubr)
+library(rstatix)
+data.df <- read.delim('E:/Users/DELL/Desktop/3_dmr_distribution_in_sv/3_shuffle/shuffle/ratio/matrix_Rbox.txt',sep = '\t',header = T)
+
+
+#geom_point(x=1,y=0.22470460929729258, shape="*",size=8,show.legend
+#dev.new()
+ggplot(data.df,aes(x=sample,y=ratio))+     
+  geom_boxplot()+ theme_cowplot(font_size = 16)+theme(axis.text.x = element_text(angle = 0,hjust = 1,size = 16))+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(text = element_text(family = "Arial",
+                            size=20))+
+  theme(axis.title.x = element_text(size=20))+
+  theme(plot.title = element_text(size = 20, family = "Arial"))+
+  theme(plot.title = element_text(hjust = 0.5))+
+  geom_point(x=1,y=0.000932836, shape=16,size=3,show.legend = F,color="red")+
+  geom_point(x=2,y=0.0017953321364452424, shape=16,size=3,show.legend = F,color="red")+ylim(c(0,0.005))
+
+### DEGs valcone plot###
+
+*R*
+
+library(ggplot2)
+library(ggrepel)
+library(data.table)
+
+# from Supplimentary table S3
+a <- read.csv("C:/Users/DELL/Desktop/diff_gene_all.csv",header = TRUE,sep = ",")
+# a <- fread("C:/Users/DELL/Desktop/diff_gene_all.csv")
+
+# a <- fread("./result/table/2_Pro_DEG_P_C.csv")  # Fig.S3F & Fig.S3H
+# a <- fread("./result/table/2_Pro_DEG_D_C.csv")
+# a <- fread("./result/table/2_Non-Pro_DEG.csv")
+
+Dat<- as.data.frame(a)
+
+# Dat$gene <- Dat$V1
+
+fc = 1
+fc1 = 0.5
+
+# gene= c("RB1","MYCN","MDM2")
+# df= as.data.frame(gene)
+  
+Dat$threshold <- 'Other'
+Dat[Dat$p_val_adj < 0.05 & Dat$avg_log2FC > fc,'threshold'] <- 'Up'
+Dat[Dat$p_val_adj < 0.05 & Dat$avg_log2FC > fc1,'threshold'] <- 'Up-Top'
+Dat[Dat$p_val_adj < 0.05 & Dat$avg_log2FC < -fc,'threshold'] <- 'Down'
+Dat[Dat$p_val_adj < 0.05 & Dat$avg_log2FC < -fc1,'threshold'] <- 'Down-Top'
+table(Dat$threshold)
+Dat$threshold <- factor(Dat$threshold,levels = c('Up','Up-Top','Down','Down-Top','Other'))
+
+ggplot(Dat,aes(x=avg_log2FC,y=-log10(p_val_adj),color=threshold))+
+  geom_point()+
+  scale_color_manual(values=c("#EEBBBB","#CD3333","#AAAAD4", "#000080","#808080"))+
+  geom_text_repel(
+    data = Dat[(Dat$p_val_adj<0.05 & abs(Dat$avg_log2FC) > fc1),],
+    aes(label = gene),
+    size = 5,
+    segment.color = "black", show.legend = FALSE,
+    max.overlaps=40)+#添加关注的点的基因名
+  theme_bw()+#修改图片背景
+  theme(
+    legend.title = element_blank(),#不显示图例标题
+  )+
+  ylab('-log10 (p-adj)')+#修改y轴名称
+  xlab('log2 (FoldChange)')+#修改x轴名称
+  geom_vline(xintercept=c(-1,1),lty=3,col="black",lwd=0.5) +#添加横线|FoldChange|>2
+  geom_hline(yintercept = -log10(0.05),lty=3,col="black",lwd=0.5)#添加竖线padj<0.05
+
+
+###Differentially methylated regions analysis###
+*R*
+##RB unique DMR###
+
+
+#! /usr/bin/env Rscript
+library(data.table)
+library(DSS)
+require(bsseq)
+
+A1 <- fread("N01.CpG.txt", header = T)
+A2 <- fread("N02.CpG.txt", header = T)
+B3 <- fread("N03.CpG.txt", header = T)
+
+datA1 <- A1[,1:4]
+datA2 <- A2[,1:4]
+datB3 <- B3[,1:4]
+
+colnames(datA1) = c("chr","pos","N","X")
+colnames(datA2) = c("chr","pos","N","X")
+colnames(datB3) = c("chr","pos","N","X")
+
+BSobj <- makeBSseqData(list(datA1, datA2, datB3),c("N01", "N02", "N03"))
+
+date()
+dmlResult <- DMLtest(BSobj, group1 = c("N01","N03" ), group2 = c("N02"), smoothing = T)
+date()
+
+dmls <- callDML(dmlResult, delta = 0.1, p.threshold = 0.05)
+dmrs <- callDMR(dmlResult, delta = 0.1, p.threshold = 0.05)
+
+write.table (dmls,file= "./1.diff_RB_CpG_dmls.txt", sep ="\t", row.names =FALSE, col.names =TRUE, quote =FALSE)
+write.table (dmrs,file= "./2.diff_RB_CpG_dmrs.txt", sep ="\t", row.names =FALSE, col.names =TRUE, quote =FALSE)
+
+##TSC unique DMR##
+
+#! /usr/bin/env Rscript
+library(data.table)
+library(DSS)
+require(bsseq)
+
+A1 <- fread("N01.CpG.txt", header = T)
+A2 <- fread("N03.CpG.txt", header = T)
+B3 <- fread("N04.CpG.txt", header = T)
+
+datA1 <- A1[,1:4]
+datB3 <- B3[,1:4]
+datB4 <- B4[,1:4]
+
+colnames(datA1) = c("chr","pos","N","X")
+colnames(datB3) = c("chr","pos","N","X")
+colnames(datB4) = c("chr","pos","N","X")
+
+BSobj <- makeBSseqData(list(datA1, datB3, datB4),c("N01", "N03","N04"))
+save(BSobj,file = '4_BSobj.Rdata')
+
+date()
+dmlResult <- DMLtest(BSobj, group1 = c("N01","N03"), group2 = c("N04"), smoothing = T)
+date()
+
+dmls <- callDML(dmlResult, delta = 0.1, p.threshold = 0.05)
+dmrs <- callDMR(dmlResult, delta = 0.1, p.threshold = 0.05)
+
+write.table (dmls,file= "./1.diff_TSC_CpG_dmls.txt", sep ="\t", row.names =FALSE, col.names =TRUE, quote =FALSE)
+write.table (dmrs,file= "./2.diff_TSC_CpG_dmrs.txt", sep ="\t", row.names =FALSE, col.names =TRUE, quote =FALSE)
+
+
+###GO & KEGG###
+*R*
+
+setwd('C:/Users/DELL/Desktop')
+library('clusterProfiler')
+library('biomaRt')
+library("ellipsis")
+
+geneName='tsc.txt'
+
+geneList=as.vector(read.table(geneName))
+
+
+#####GO#####
+GO=enrichGO(geneList$V1, OrgDb='org.Hs.eg.db', keyType = "SYMBOL", ont = "BP",
+            pvalueCutoff = 0.05, pAdjustMethod = "BH",qvalueCutoff = 0.2)
+num=which(GO@result$p.adjust<0.05)
+write.table(GO@result,paste0(geneName,'.go'),sep='\t',quote = F,row.names = F)
+gosimp <- simplify(GO,cutoff=0.7,by="p.adjust",select_fun=min,measure="Wang")
+num=which(gosimp@result$p.adjust<0.05)
+num
+write.table(gosimp@result,paste0(geneName,'.goSimp'),sep='\t',quote = F,row.names = F)
+
+
+#symbol 2 ENTREZID
+ensembl = useMart('ensembl',dataset='hsapiens_gene_ensembl')
+map=getBM(attributes = c("hgnc_symbol", "ensembl_gene_id", "entrezgene_id"), 
+          filters = "hgnc_symbol",
+          values = geneList$V1,
+          mart = ensembl) 
+mapUniq <- map[!duplicated(map$hgnc_symbol),]
+
+#####KEGG#####
+KEGG=enrichKEGG(mapUniq$entrezgene_id, organism ="human", pvalueCutoff = 0.05)
+num=which(KEGG@result$p.adjust<0.05)
+num
+write.table(KEGG@result,paste0(geneName,'.KEGG'),sep='\t',quote = F,row.names = F)
+
+dotplot(KEGG,showCategory = 25, color="pvalue")
+
+###
+
+
